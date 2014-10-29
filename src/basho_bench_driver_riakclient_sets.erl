@@ -73,16 +73,18 @@ new(Id) ->
 
 run(set_append_only, KeyGen, ValueGen, State) ->
     N = State#state.batchsize,
-    Values = lists:map (fun (_) -> ValueGen() end, lists:seq(1, N)),
     Set = lists:foldr(fun (X, Acc) ->
                               riakc_set:add_element(X, Acc)
-                      end, riakc_set:new(), Values),
+                      end,
+                      riakc_set:new(),
+                      lists:map (fun (_) ->
+                                         ValueGen()
+                                 end, lists:seq(1, N))),
 
     BPrefix = State#state.bucket_prefix,
     BGen = State#state.bucket_generator,
-    BSuffix = integer_to_list(BGen()),
-    BSS = list_to_binary(BSuffix),
-    Bucket = <<BPrefix/binary,BSS/binary>>,
+    BSuffix = list_to_binary(integer_to_list(BGen())),
+    Bucket = <<BPrefix/binary,BSuffix/binary>>,
 
     case riakc_pb_socket:update_type(State#state.pid,
                                      { State#state.type, Bucket },
