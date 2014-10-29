@@ -1,9 +1,8 @@
 Basho bench Riak Set extension
 ==============================
 
-This project contains a custom drivers and a few generator functions
-to aid in benchmarking and testing Riak in a setting where we have to
-use different buckets, and add-only Sets.
+This is a custom driver to aid in benchmarking and testing Riak in a
+setting where we have to use different buckets, and add-only Sets.
 
 For more information about basho bench, please see its
 [documentation][docs:basho-bench], and the examples herein in the
