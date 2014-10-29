@@ -1,0 +1,12 @@
+{application, basho_bench_riak_sets,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { basho_bench_riak_sets_app, []}},
+  {env, []}
+ ]}.
