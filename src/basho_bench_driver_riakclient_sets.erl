@@ -29,11 +29,7 @@
 
 -record(state, { pid, batchsize, type,
                  bucket_prefix, bucket_generator,
-
-                 replies,
-                 timeout_general, timeout_read, timeout_write }).
-
--define(TIMEOUT_GENERAL, 62*1000).
+                 options }).
 
 %% ====================================================================
 %% API
@@ -51,11 +47,11 @@ new(Id) ->
 
     Ips       = basho_bench_config:get(riakclient_sets_ips, [{127,0,0,1}]),
     Port      = basho_bench_config:get(riakclient_sets_port, 8087),
-    Replies   = basho_bench_config:get(riakclient_sets_replies, quorum),
     BatchSize = basho_bench_config:get(riakclient_sets_batch_size, 1),
     Type      = basho_bench_config:get(riakclient_sets_type, <<"sets">>),
     BPrefix   = basho_bench_config:get(riakclient_sets_bucket_prefix, <<"bbs_">>),
     BMax      = basho_bench_config:get(riakclient_sets_bucket_max, 10000),
+    Options   = basho_bench_config:get(riakclient_sets_options, []),
 
     Targets = basho_bench_config:normalize_ips(Ips, Port),
     {TargetIp, TargetPort} = lists:nth((Id rem length(Targets)+1), Targets),
@@ -68,11 +64,7 @@ new(Id) ->
                           type = Type,
                           bucket_prefix = BPrefix,
                           bucket_generator = basho_bench_keygen:new({uniform_int, BMax}, Id),
-
-                          replies = Replies,
-                          timeout_general = get_timeout_general(),
-                          timeout_read = get_timeout(pb_timeout_read),
-                          timeout_write = get_timeout(pb_timeout_write)
+                          options = Options
                         }};
         {error, Reason2} ->
             ?FAIL_MSG("Failed to connect riakc_pb_socket to ~p:~p: ~p\n",
@@ -93,7 +85,7 @@ run(set_append_only, KeyGen, ValueGen, State) ->
                                      { State#state.type, Bucket },
                                      KeyGen(),
                                      riakc_set:to_op(Set1),
-                                     [{timeout, State#state.timeout_write}]) of
+                                     State#state.options) of
         ok ->
             {ok, State};
         {error, disconnected} ->
@@ -112,7 +104,7 @@ run(set_get, KeyGen, ValueGen, State) ->
     case riakc_pb_socket:fetch_type(State#state.pid,
                                     { State#state.type, Bucket },
                                     KeyGen(),
-                                    [{timeout, State#state.timeout_read}]) of
+                                    State#state.options) of
         {ok, _} ->
             {ok, State};
         {error, {notfound, set}} ->
@@ -126,15 +118,6 @@ run(set_get, KeyGen, ValueGen, State) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-
-get_timeout_general() ->
-    basho_bench_config:get(pb_timeout_general, ?TIMEOUT_GENERAL).
-
-get_timeout(Name) when Name == pb_timeout_read;
-                       Name == pb_timeout_write;
-                       Name == pb_timeout_listkeys;
-                       Name == pb_timeout_mapreduce ->
-    basho_bench_config:get(Name, get_timeout_general()).
 
 get_connect_options() ->
     basho_bench_config:get(pb_connect_options, [{auto_reconnect, true}]).
