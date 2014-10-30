@@ -50,8 +50,8 @@ new(Id) ->
     BatchSize = basho_bench_config:get(riakclient_sets_batch_size, 1),
     Type      = basho_bench_config:get(riakclient_sets_type, <<"sets">>),
     BGen      = basho_bench_config:get(bucket_generator,
-                                       {function, rcs_keygen, numbered_bin,
-                                        [<<"customer">>, {uniform_int, 1000}]}),
+                                       {concat_binary, <<"bucket_">>,
+                                        {to_binstr, "~b", {uniform_int, 1000}}}),
     BucketGen = basho_bench_keygen:new(BGen, Id),
     Options   = basho_bench_config:get(riakclient_sets_options, []),
 
