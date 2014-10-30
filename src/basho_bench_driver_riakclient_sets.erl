@@ -28,7 +28,7 @@
 -include("deps/basho_bench/include/basho_bench.hrl").
 
 -record(state, { pid, batchsize, type,
-                 bucket_prefix, bucket_generator,
+                 bucket_generator,
                  options }).
 
 %% ====================================================================
@@ -49,8 +49,10 @@ new(Id) ->
     Port      = basho_bench_config:get(riakclient_sets_port, 8087),
     BatchSize = basho_bench_config:get(riakclient_sets_batch_size, 1),
     Type      = basho_bench_config:get(riakclient_sets_type, <<"sets">>),
-    BPrefix   = basho_bench_config:get(riakclient_sets_bucket_prefix, <<"bbs_">>),
-    BMax      = basho_bench_config:get(riakclient_sets_bucket_max, 10000),
+    BGen      = basho_bench_config:get(bucket_generator,
+                                       {function, rcs_keygen, numbered_bin,
+                                        [<<"customer">>, {uniform_int, 1000}]}),
+    BucketGen = basho_bench_keygen:new(BGen, Id),
     Options   = basho_bench_config:get(riakclient_sets_options, []),
 
     Targets = basho_bench_config:normalize_ips(Ips, Port),
@@ -62,8 +64,7 @@ new(Id) ->
             {ok, #state { pid = Pid,
                           batchsize = BatchSize,
                           type = Type,
-                          bucket_prefix = BPrefix,
-                          bucket_generator = basho_bench_keygen:new({uniform_int, BMax}, Id),
+                          bucket_generator = BucketGen,
                           options = Options
                         }};
         {error, Reason2} ->
@@ -81,13 +82,10 @@ run(set_append_only, KeyGen, ValueGen, State) ->
                                          ValueGen()
                                  end, lists:seq(1, N))),
 
-    BPrefix = State#state.bucket_prefix,
-    BGen = State#state.bucket_generator,
-    BSuffix = list_to_binary(integer_to_list(BGen())),
-    Bucket = <<BPrefix/binary,BSuffix/binary>>,
+    BucketGen = State#state.bucket_generator,
 
     case riakc_pb_socket:update_type(State#state.pid,
-                                     { State#state.type, Bucket },
+                                     { State#state.type, BucketGen() },
                                      KeyGen(),
                                      riakc_set:to_op(Set),
                                      State#state.options) of
@@ -100,14 +98,10 @@ run(set_append_only, KeyGen, ValueGen, State) ->
     end;
 
 run(set_get, KeyGen, ValueGen, State) ->
-    BPrefix = State#state.bucket_prefix,
-    BGen = State#state.bucket_generator,
-    BSuffix = integer_to_list(BGen()),
-    BSS = list_to_binary(BSuffix),
-    Bucket = <<BPrefix/binary,BSS/binary>>,
+    BucketGen = State#state.bucket_generator,
 
     case riakc_pb_socket:fetch_type(State#state.pid,
-                                    { State#state.type, Bucket },
+                                    { State#state.type, BucketGen() },
                                     KeyGen(),
                                     State#state.options) of
         {ok, _} ->
