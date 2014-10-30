@@ -27,8 +27,8 @@
 
 -include("deps/basho_bench/include/basho_bench.hrl").
 
--record(state, { pid, batchsize, type,
-                 bucket_generator,
+-record(state, { pid, type,
+                 bucket_generator, batch_size_generator,
                  options }).
 
 %% ====================================================================
@@ -47,12 +47,14 @@ new(Id) ->
 
     Ips       = basho_bench_config:get(riakclient_sets_ips, [{127,0,0,1}]),
     Port      = basho_bench_config:get(riakclient_sets_port, 8087),
-    BatchSize = basho_bench_config:get(riakclient_sets_batch_size, 1),
     Type      = basho_bench_config:get(riakclient_sets_type, <<"sets">>),
     BGen      = basho_bench_config:get(bucket_generator,
                                        {concat_binary, <<"bucket_">>,
                                         {to_binstr, "~b", {uniform_int, 1000}}}),
     BucketGen = basho_bench_keygen:new(BGen, Id),
+    BSGenSpec = basho_bench_config:get(batch_size_generator,
+                                       {pareto_int, 10}),
+    BSGen     = basho_bench_keygen:new(BSGenSpec, Id),
     Options   = basho_bench_config:get(riakclient_sets_options, []),
 
     Targets = basho_bench_config:normalize_ips(Ips, Port),
@@ -62,9 +64,9 @@ new(Id) ->
     case riakc_pb_socket:start_link(TargetIp, TargetPort, get_connect_options()) of
         {ok, Pid} ->
             {ok, #state { pid = Pid,
-                          batchsize = BatchSize,
                           type = Type,
                           bucket_generator = BucketGen,
+                          batch_size_generator = BSGen,
                           options = Options
                         }};
         {error, Reason2} ->
@@ -73,7 +75,8 @@ new(Id) ->
     end.
 
 run(set_append_only, KeyGen, ValueGen, State) ->
-    N = State#state.batchsize,
+    BSG = State#state.batch_size_generator,
+    N = BSG() + 1,
     Set = lists:foldr(fun (X, Acc) ->
                               riakc_set:add_element(X, Acc)
                       end,
