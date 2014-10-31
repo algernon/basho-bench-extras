@@ -63,12 +63,18 @@ new(Id) ->
 
     case riakc_pb_socket:start_link(TargetIp, TargetPort, get_connect_options()) of
         {ok, Pid} ->
-            {ok, #state { pid = Pid,
-                          type = Type,
-                          bucket_generator = BucketGen,
-                          batch_size_generator = BSGen,
-                          options = Options
-                        }};
+            case riakc_pb_socket:get_bucket_type(Pid, Type) of
+                {ok, _} ->
+                    {ok, #state { pid = Pid,
+                                  type = Type,
+                                  bucket_generator = BucketGen,
+                                  batch_size_generator = BSGen,
+                                  options = Options
+                                }};
+                {error, Reason1} ->
+                    ?FAIL_MSG("Error checking bucket type ~p's properties: ~p\n",
+                              [Type, Reason1])
+            end;
         {error, Reason2} ->
             ?FAIL_MSG("Failed to connect riakc_pb_socket to ~p:~p: ~p\n",
                       [TargetIp, TargetPort, Reason2])
