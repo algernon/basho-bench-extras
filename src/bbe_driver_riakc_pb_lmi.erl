@@ -76,21 +76,22 @@ new(Id) ->
                       [TargetIp, TargetPort, Reason2])
     end.
 
-run(bucket_set_append, KeyGen, ValueGen, State) ->
-    LocationGen = State#state.location_generator,
+run(bucket_set_append, KeyGen, ValueGen,
+    #state{location_generator = LocationGen, bucket_size = BucketSize,
+           pid = Pid, type = Type, options = Options} = State) ->
     Set = lists:foldr(fun (X, Acc) ->
                               riakc_set:add_element(X, Acc)
                       end,
                       riakc_set:new(),
                       lists:map (fun (_) ->
                                          ValueGen()
-                                 end, lists:seq(1, State#state.bucket_size))),
+                                 end, lists:seq(1, BucketSize))),
     {Bucket, Key} = LocationGen(),
 
-    case riakc_pb_socket:update_type(State#state.pid,
-                                     { State#state.type, Bucket },
+    case riakc_pb_socket:update_type(Pid,
+                                     { Type, Bucket },
                                      Key, riakc_set:to_op(Set),
-                                     State#state.options) of
+                                     Options) of
         ok ->
             {ok, State};
         {error, disconnected} ->

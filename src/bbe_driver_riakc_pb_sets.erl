@@ -80,9 +80,10 @@ new(Id) ->
                       [TargetIp, TargetPort, Reason2])
     end.
 
-run(set_append_only, KeyGen, ValueGen, State) ->
-    BSG = State#state.batch_size_generator,
-    N = BSG() + 1,
+run(set_append_only, KeyGen, ValueGen,
+    #state{batch_size_generator = BSGen, bucket_generator = BucketGen,
+           pid = Pid, type = Type, options = Options} = State) ->
+    N = BSGen() + 1,
     Set = lists:foldr(fun (X, Acc) ->
                               riakc_set:add_element(X, Acc)
                       end,
@@ -91,13 +92,11 @@ run(set_append_only, KeyGen, ValueGen, State) ->
                                          ValueGen()
                                  end, lists:seq(1, N))),
 
-    BucketGen = State#state.bucket_generator,
-
-    case riakc_pb_socket:update_type(State#state.pid,
-                                     { State#state.type, BucketGen() },
+    case riakc_pb_socket:update_type(Pid,
+                                     { Type, BucketGen() },
                                      KeyGen(),
                                      riakc_set:to_op(Set),
-                                     State#state.options) of
+                                     Options) of
         ok ->
             {ok, State};
         {error, disconnected} ->
@@ -106,13 +105,13 @@ run(set_append_only, KeyGen, ValueGen, State) ->
             {error, Reason, State}
     end;
 
-run(set_get, KeyGen, ValueGen, State) ->
-    BucketGen = State#state.bucket_generator,
-
-    case riakc_pb_socket:fetch_type(State#state.pid,
-                                    { State#state.type, BucketGen() },
+run(set_get, KeyGen, ValueGen,
+    #state{bucket_generator = BucketGen, pid = Pid, type = Type,
+           options = Options} = State) ->
+    case riakc_pb_socket:fetch_type(Pid,
+                                    { Type, BucketGen() },
                                     KeyGen(),
-                                    State#state.options) of
+                                    Options) of
         {ok, _} ->
             {ok, State};
         {error, {notfound, set}} ->
