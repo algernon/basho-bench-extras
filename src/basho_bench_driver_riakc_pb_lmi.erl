@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% basho-bench-riak-sets: Riak Set benchmark plugin for basho_bench
+%% basho-bench-extras: basho_bench extensions
 %%
 %% Copyright (c) 2014 Gergely Nagy <algernon@madhouse-project.org>
 %%

@@ -1,13 +1,15 @@
-Basho bench Riak Set extension
-==============================
+basho_bench extras
+==================
 
-This is a custom driver to aid in benchmarking and testing Riak in a
-setting where we have to use different buckets, and add-only Sets.
+This repository contains various custom drivers, generators and
+utilities that extend [basho_bench][gh:basho-bench]. It is mostly Riak
+and Cassandra stuff.
 
 For more information about basho bench, please see its
 [documentation][docs:basho-bench], and the examples herein in the
 `examples/` directory.
 
+ [gh:basho-bench]: https://github.com/basho/basho_bench
  [docs:basho-bench]: http://docs.basho.com/riak/latest/ops/building/benchmarking/
 
 Usage
