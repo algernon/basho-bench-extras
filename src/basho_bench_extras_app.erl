@@ -1,4 +1,4 @@
--module(basho_bench_riak_sets_app).
+-module(basho_bench_extras_app).
 
 -behaviour(application).
 
@@ -10,7 +10,7 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    basho_bench_riak_sets_sup:start_link().
+    basho_bench_extras_sup:start_link().
 
 stop(_State) ->
     ok.

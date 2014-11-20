@@ -20,7 +20,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(basho_bench_driver_riakclient_sets).
+-module(bbe_driver_riakc_pb_lmi).
 
 -export([new/1,
          run/4]).
@@ -28,7 +28,7 @@
 -include("deps/basho_bench/include/basho_bench.hrl").
 
 -record(state, { pid, type,
-                 bucket_generator, batch_size_generator,
+                 location_generator, bucket_size,
                  options }).
 
 %% ====================================================================
@@ -48,13 +48,9 @@ new(Id) ->
     Ips       = basho_bench_config:get(riakclient_sets_ips, [{127,0,0,1}]),
     Port      = basho_bench_config:get(riakclient_sets_port, 8087),
     Type      = basho_bench_config:get(riakclient_sets_type, <<"sets">>),
-    BGen      = basho_bench_config:get(bucket_generator,
-                                       {concat_binary, <<"bucket_">>,
-                                        {to_binstr, "~b", {uniform_int, 1000}}}),
-    BucketGen = basho_bench_keygen:new(BGen, Id),
-    BSGenSpec = basho_bench_config:get(batch_size_generator,
-                                       {pareto_int, 10}),
-    BSGen     = basho_bench_keygen:new(BSGenSpec, Id),
+    LGenSpec  = basho_bench_config:get(location_generator),
+    LGen      = lmi_gen:new(LGenSpec, Id),
+    BuckSize  = basho_bench_config:get(batch_size, 10),
     Options   = basho_bench_config:get(riakclient_sets_options, []),
 
     Targets = basho_bench_config:normalize_ips(Ips, Port),
@@ -67,8 +63,8 @@ new(Id) ->
                 {ok, _} ->
                     {ok, #state { pid = Pid,
                                   type = Type,
-                                  bucket_generator = BucketGen,
-                                  batch_size_generator = BSGen,
+                                  location_generator = LGen,
+                                  bucket_size = BuckSize,
                                   options = Options
                                 }};
                 {error, Reason1} ->
@@ -80,45 +76,25 @@ new(Id) ->
                       [TargetIp, TargetPort, Reason2])
     end.
 
-run(set_append_only, KeyGen, ValueGen, State) ->
-    BSG = State#state.batch_size_generator,
-    N = BSG() + 1,
+run(bucket_set_append, KeyGen, ValueGen, State) ->
+    LocationGen = State#state.location_generator,
     Set = lists:foldr(fun (X, Acc) ->
                               riakc_set:add_element(X, Acc)
                       end,
                       riakc_set:new(),
                       lists:map (fun (_) ->
                                          ValueGen()
-                                 end, lists:seq(1, N))),
-
-    BucketGen = State#state.bucket_generator,
+                                 end, lists:seq(1, State#state.bucket_size))),
+    {Bucket, Key} = LocationGen(),
 
     case riakc_pb_socket:update_type(State#state.pid,
-                                     { State#state.type, BucketGen() },
-                                     KeyGen(),
-                                     riakc_set:to_op(Set),
+                                     { State#state.type, Bucket },
+                                     Key, riakc_set:to_op(Set),
                                      State#state.options) of
         ok ->
             {ok, State};
         {error, disconnected} ->
-            run(set_append_only, KeyGen, ValueGen, State);
-        {error, Reason} ->
-            {error, Reason, State}
-    end;
-
-run(set_get, KeyGen, ValueGen, State) ->
-    BucketGen = State#state.bucket_generator,
-
-    case riakc_pb_socket:fetch_type(State#state.pid,
-                                    { State#state.type, BucketGen() },
-                                    KeyGen(),
-                                    State#state.options) of
-        {ok, _} ->
-            {ok, State};
-        {error, {notfound, set}} ->
-            {ok, State};
-        {error, disconnected} ->
-            run(set_get, KeyGen, ValueGen, State);
+            run(bucket_set_append, KeyGen, ValueGen, State);
         {error, Reason} ->
             {error, Reason, State}
     end.

@@ -1,4 +1,4 @@
--module(basho_bench_riak_sets_sup).
+-module(basho_bench_extras_sup).
 
 -behaviour(supervisor).
 
