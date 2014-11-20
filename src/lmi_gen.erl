@@ -22,7 +22,9 @@
 
 -module(lmi_gen).
 
--export([new/2]).
+-export([new/2,
+         str_concat/3,
+         identity/2]).
 
 -include("deps/basho_bench/include/basho_bench.hrl").
 
@@ -36,4 +38,15 @@ new({timeseries, BucketGenSpec, ChunkSize}, Id) ->
                                      {uniform_int, MaxKeys}}, Id),
     fun () ->
             {Bucket, KeyGen()}
+    end.
+
+str_concat(Id, Prefix, GenSpec) ->
+    Keygen = basho_bench_keygen:new(GenSpec, Id),
+    fun () ->
+            Prefix ++ binary_to_list(Keygen())
+    end.
+
+identity(_Id, Value) ->
+    fun () ->
+            Value
     end.
