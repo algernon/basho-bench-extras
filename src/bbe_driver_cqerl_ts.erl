@@ -97,6 +97,31 @@ run(ts_insert, KeyGen, _ValueGen,
             {ok, State};
         {error, Error} ->
             {error, Error, Statement, Values, State}
+    end;
+
+run(ts_insert, KeyGen, _ValueGen,
+    #state{client = C, columnfamily = ColumnFamily,
+           date_gen = DateGen, numval_gen = NumValGen,
+           time_gen = TimeGen,
+           use_prepared = false} = State) ->
+
+    Statement = "INSERT INTO " ++ ColumnFamily ++
+        " (topic, date, time, numericvalue)" ++
+        " VALUES ('" ++ KeyGen() ++ "', " ++
+        integer_to_list(DateGen()) ++
+        ", " ++ TimeGen() ++ ", " ++
+        integer_to_list(NumValGen()) ++ ");",
+    Query = #cql_query{statement = Statement,
+                       consistency = ?CQERL_CONSISTENCY_ANY,
+                      reusable = true},
+
+    case cqerl:run_query(C, Query) of
+        {ok, void} ->
+            {ok, State};
+        {ok, _} ->
+            {ok, State};
+        {error, Error} ->
+            {error, Error, Statement, State}
     end.
 
 %% ====================================================================
