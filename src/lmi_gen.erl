@@ -50,3 +50,11 @@ identity(_Id, Value) ->
     fun () ->
             Value
     end.
+
+fixed_ascii(_Id, Size)
+  when is_integer(Size), Size >= 0 ->
+    fun() ->
+            list_to_binary(lists:map(fun (_) ->
+                                             random:uniform(31)+97
+                                     end, lists:seq(1, Size)))
+    end.
