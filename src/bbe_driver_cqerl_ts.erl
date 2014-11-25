@@ -55,7 +55,17 @@ new(Id) ->
     TimeGen      = basho_bench_config:get(cqerl_timegen),
     NumValGen    = basho_bench_config:get(cqerl_numvalgen),
 
-    application:ensure_all_started(cqerl),
+    case erlang:function_exported(application, ensure_all_started, 1) of
+        true -> application:ensure_all_started(cqerl);
+        false ->
+            application:start(crypto),
+            application:start(asn1),
+            application:start(public_key),
+            application:start(ssl),
+            application:start(pooler),
+            application:start(cqerl)
+    end,
+
     {ok, C} = cqerl:new_client({Host, Port}),
     ?INFO("ID: ~p, Connected to Cassandra at ~p:~p\n", [Id, Host, Port]),
 
