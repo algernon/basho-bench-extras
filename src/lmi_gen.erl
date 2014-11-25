@@ -24,7 +24,8 @@
 
 -export([new/2,
          str_concat/3,
-         identity/2]).
+         identity/2,
+         fixed_ascii/2]).
 
 -include("deps/basho_bench/include/basho_bench.hrl").
 
