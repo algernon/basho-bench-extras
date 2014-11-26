@@ -87,7 +87,7 @@ run(ts_insert, KeyGen, ValueGen,
 
     Statement = "INSERT INTO " ++ ColumnFamily ++
         " (topic, date, time, numericvalue, category)" ++
-        " VALUES (?, ?, mintimeuuid(?), ?);",
+        " VALUES (?, ?, mintimeuuid(?), ?, ?);",
     Query = #cql_query{statement = Statement,
                        consistency = ?CQERL_CONSISTENCY_ANY,
                        reusable = true},
