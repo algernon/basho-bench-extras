@@ -46,14 +46,14 @@ new(Id) ->
             ok
     end,
 
-    Host         = basho_bench_config:get(cqerl_host, "localhost"),
-    Port         = basho_bench_config:get(cqerl_port, 9042),
-    Keyspace     = basho_bench_config:get(cqerl_keyspace, "Keyspace1"),
-    ColumnFamily = basho_bench_config:get(cqerl_columnfamily, "ColumnFamily1"),
-    Prepared     = basho_bench_config:get(cqerl_use_prepared, false),
-    DateGen      = basho_bench_config:get(cqerl_dategen),
-    TimeGen      = basho_bench_config:get(cqerl_timegen),
-    NumValGen    = basho_bench_config:get(cqerl_numvalgen),
+    Host         = basho_bench_config:get(cassandra_host, "localhost"),
+    Port         = basho_bench_config:get(cassandra_port, 9042),
+    Keyspace     = basho_bench_config:get(cassandra_keyspace, "Keyspace1"),
+    ColumnFamily = basho_bench_config:get(cassandra_columnfamily, "ColumnFamily1"),
+    Prepared     = basho_bench_config:get(cassandra_use_prepared, false),
+    DateGen      = basho_bench_config:get(cassandra_dategen),
+    TimeGen      = basho_bench_config:get(cassandra_timegen),
+    NumValGen    = basho_bench_config:get(cassandra_numvalgen),
 
     case erlang:function_exported(application, ensure_all_started, 1) of
         true -> application:ensure_all_started(cqerl);
