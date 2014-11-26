@@ -29,7 +29,6 @@
 -include("deps/cqerl/include/cqerl.hrl").
 
 -record(state, { client, keyspace, columnfamily,
-                 use_prepared,
                  date_gen, time_gen,
                  numval_gen }).
 
@@ -50,7 +49,6 @@ new(Id) ->
     Port         = basho_bench_config:get(cassandra_port, 9042),
     Keyspace     = basho_bench_config:get(cassandra_keyspace, "Keyspace1"),
     ColumnFamily = basho_bench_config:get(cassandra_columnfamily, "ColumnFamily1"),
-    Prepared     = basho_bench_config:get(cassandra_use_prepared, false),
     DateGen      = basho_bench_config:get(cassandra_dategen),
     TimeGen      = basho_bench_config:get(cassandra_timegen),
     NumValGen    = basho_bench_config:get(cassandra_numvalgen),
@@ -74,7 +72,6 @@ new(Id) ->
             {ok, #state { client = C,
                           keyspace = Keyspace,
                           columnfamily = ColumnFamily,
-                          use_prepared = Prepared,
 
                           date_gen = basho_bench_keygen:new(DateGen, Id),
                           time_gen = basho_bench_keygen:new(TimeGen, Id),
@@ -86,15 +83,14 @@ new(Id) ->
 run(ts_insert, KeyGen, _ValueGen,
     #state{client = C, columnfamily = ColumnFamily,
            date_gen = DateGen, numval_gen = NumValGen,
-           time_gen = TimeGen,
-           use_prepared = true} = State) ->
+           time_gen = TimeGen} = State) ->
 
     Statement = "INSERT INTO " ++ ColumnFamily ++
         " (topic, date, time, numericvalue)" ++
         " VALUES (?, ?, ?, ?);",
     Query = #cql_query{statement = Statement,
                        consistency = ?CQERL_CONSISTENCY_ANY,
-                      reusable = true},
+                       reusable = true},
     Values = [{topic, KeyGen()},
               {date, DateGen()},
               {time, TimeGen()},
@@ -107,31 +103,6 @@ run(ts_insert, KeyGen, _ValueGen,
             {ok, State};
         {error, Error} ->
             {error, Error, Statement, Values, State}
-    end;
-
-run(ts_insert, KeyGen, _ValueGen,
-    #state{client = C, columnfamily = ColumnFamily,
-           date_gen = DateGen, numval_gen = NumValGen,
-           time_gen = TimeGen,
-           use_prepared = false} = State) ->
-
-    Statement = "INSERT INTO " ++ ColumnFamily ++
-        " (topic, date, time, numericvalue)" ++
-        " VALUES ('" ++ KeyGen() ++ "', " ++
-        integer_to_list(DateGen()) ++
-        ", " ++ TimeGen() ++ ", " ++
-        integer_to_list(NumValGen()) ++ ");",
-    Query = #cql_query{statement = Statement,
-                       consistency = ?CQERL_CONSISTENCY_ANY,
-                      reusable = true},
-
-    case cqerl:run_query(C, Query) of
-        {ok, void} ->
-            {ok, State};
-        {ok, _} ->
-            {ok, State};
-        {error, Error} ->
-            {error, Error, Statement, State}
     end.
 
 %% ====================================================================
