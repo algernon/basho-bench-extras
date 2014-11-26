@@ -68,18 +68,19 @@ new(Id) ->
             ?FAIL_MSG("Failed to use keyspace ~p: ~p\n", [Keyspace, Reason])
     end.
 
-run(ts_insert, KeyGen, _ValueGen,
+run(ts_insert, KeyGen, ValueGen,
     #state{client = C, columnfamily = ColumnFamily,
            date_gen = DateGen, numval_gen = NumValGen,
            time_gen = TimeGen} = State) ->
 
     Statement = "INSERT INTO " ++ ColumnFamily ++
-        " (topic, date, time, numericvalue)" ++
-        " VALUES (?, ?, mintimeuuid(?), ?);",
+        " (topic, date, time, numericvalue, category)" ++
+        " VALUES (?, ?, mintimeuuid(?), ?, ?);",
     Values = [list_to_binary(KeyGen()),
               DateGen(),
               millis_to_timestamp(TimeGen()),
-              NumValGen()],
+              NumValGen(),
+              ValueGen()],
 
     case seestar_session:prepare(C, Statement) of
         {ok, Prepared} ->

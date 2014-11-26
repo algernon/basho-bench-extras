@@ -80,13 +80,13 @@ new(Id) ->
             ?FAIL_MSG("Failed to use keyspace ~p: ~p\n", [Keyspace, Reason])
     end.
 
-run(ts_insert, KeyGen, _ValueGen,
+run(ts_insert, KeyGen, ValueGen,
     #state{client = C, columnfamily = ColumnFamily,
            date_gen = DateGen, numval_gen = NumValGen,
            time_gen = TimeGen} = State) ->
 
     Statement = "INSERT INTO " ++ ColumnFamily ++
-        " (topic, date, time, numericvalue)" ++
+        " (topic, date, time, numericvalue, category)" ++
         " VALUES (?, ?, mintimeuuid(?), ?);",
     Query = #cql_query{statement = Statement,
                        consistency = ?CQERL_CONSISTENCY_ANY,
@@ -94,7 +94,8 @@ run(ts_insert, KeyGen, _ValueGen,
     Values = [{topic, KeyGen()},
               {date, DateGen()},
               {'arg0(mintimeuuid)', TimeGen()},
-              {numericvalue, NumValGen()}],
+              {numericvalue, NumValGen()},
+              {category, binary_to_list(ValueGen())}],
 
     case cqerl:run_query(C, Query#cql_query{values = Values}) of
         {ok, void} ->
