@@ -87,13 +87,13 @@ run(ts_insert, KeyGen, _ValueGen,
 
     Statement = "INSERT INTO " ++ ColumnFamily ++
         " (topic, date, time, numericvalue)" ++
-        " VALUES (?, ?, ?, ?);",
+        " VALUES (?, ?, mintimeuuid(?), ?);",
     Query = #cql_query{statement = Statement,
                        consistency = ?CQERL_CONSISTENCY_ANY,
                        reusable = true},
     Values = [{topic, KeyGen()},
               {date, DateGen()},
-              {time, TimeGen()},
+              {'arg0(mintimeuuid)', TimeGen()},
               {numericvalue, NumValGen()}],
 
     case cqerl:run_query(C, Query#cql_query{values = Values}) of
