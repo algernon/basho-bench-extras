@@ -29,7 +29,7 @@
 -include("deps/cqerl/include/cqerl.hrl").
 
 -record(state, { client, keyspace, columnfamily,
-                 date_gen, time_gen }).
+                 date_gen, time_gen, min_timediff }).
 
 %% ====================================================================
 %% API
@@ -51,6 +51,7 @@ new(Id) ->
     ReplFactor   = basho_bench_config:get(cassandra_keyspace_replication_factor, 1),
     DateGen      = basho_bench_config:get(cassandra_dategen),
     TimeGen      = basho_bench_config:get(cassandra_timegen),
+    MinTimeDiff  = basho_bench_config:get(cassandra_select_min_timediff, 10),
 
     case erlang:function_exported(application, ensure_all_started, 1) of
         true -> application:ensure_all_started(cqerl);
@@ -73,7 +74,8 @@ new(Id) ->
                           columnfamily = ColumnFamily,
 
                           date_gen = basho_bench_keygen:new(DateGen, Id),
-                          time_gen = basho_bench_keygen:new(TimeGen, Id)}};
+                          time_gen = basho_bench_keygen:new(TimeGen, Id),
+                          min_timediff = MinTimeDiff}};
         {error, Reason} ->
             ?FAIL_MSG("Failed to bootstrap keyspace ~p: ~p\n", [Keyspace, Reason])
     end.
@@ -93,6 +95,29 @@ run(ts_insert, KeyGen, ValueGen,
               {'arg0(mintimeuuid)', TimeGen()},
               {padding, binary_to_list(ValueGen())}],
 
+    case cqerl:run_query(C, Query#cql_query{values = Values}) of
+        {ok, void} ->
+            {ok, State};
+        {ok, _} ->
+            {ok, State};
+        {error, Error} ->
+            {error, Error, Statement, Values, State}
+    end;
+run(ts_select, KeyGen, _ValueGen,
+   #state{client = C, columnfamily = ColumnFamily,
+          date_gen = DateGen, time_gen = TimeGen,
+          min_timediff = MinTimeDiff} = State) ->
+    Statement = "SELECT topic, date, time FROM " ++ ColumnFamily ++
+        " WHERE topic = ? AND date = ? AND " ++
+        "time > minTimeuuid(?) AND time < maxTimeuuid(?);",
+    Query = #cql_query{statement = Statement,
+                       consistency = ?CQERL_CONSISTENCY_ONE,
+                       reusable = true},
+    {MinTime, MaxTime} = generate_time_range(TimeGen, {MinTimeDiff}),
+    Values = [{topic, KeyGen()},
+              {date, DateGen()},
+              {'arg0(mintimeuuid)', MinTime},
+              {'arg0(maxtimeuuid)', MaxTime}],
     case cqerl:run_query(C, Query#cql_query{values = Values}) of
         {ok, void} ->
             {ok, State};
@@ -130,3 +155,13 @@ bootstrap_keyspace(C, Keyspace, ColumnFamily, ReplicationFactor) ->
         "WITH CLUSTERING ORDER BY (Time Asc);",
     ?DEBUG("~p => ~p\n", [CreateTableStmt, cqerl:run_query(C, CreateTableStmt)]),
     ok.
+
+generate_time_range(TimeGen, {MinTimeDiff}) ->
+    generate_time_range(TimeGen, {TimeGen(), MinTimeDiff});
+generate_time_range(TimeGen, {Minimum, MinTimeDiff}) ->
+    Time = TimeGen(),
+    if abs(Time - Minimum) =< MinTimeDiff ->
+            generate_time_range(TimeGen, {Minimum, MinTimeDiff});
+       true ->
+            {Minimum, Time}
+    end.
