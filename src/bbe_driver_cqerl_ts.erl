@@ -29,8 +29,7 @@
 -include("deps/cqerl/include/cqerl.hrl").
 
 -record(state, { client, keyspace, columnfamily,
-                 date_gen, time_gen,
-                 numval_gen }).
+                 date_gen, time_gen }).
 
 %% ====================================================================
 %% API
@@ -49,9 +48,9 @@ new(Id) ->
     Port         = basho_bench_config:get(cassandra_port, 9042),
     Keyspace     = basho_bench_config:get(cassandra_keyspace, "Keyspace1"),
     ColumnFamily = basho_bench_config:get(cassandra_columnfamily, "ColumnFamily1"),
+    ReplFactor   = basho_bench_config:get(cassandra_keyspace_replication_factor, 1),
     DateGen      = basho_bench_config:get(cassandra_dategen),
     TimeGen      = basho_bench_config:get(cassandra_timegen),
-    NumValGen    = basho_bench_config:get(cassandra_numvalgen),
 
     case erlang:function_exported(application, ensure_all_started, 1) of
         true -> application:ensure_all_started(cqerl);
@@ -67,35 +66,32 @@ new(Id) ->
     {ok, C} = cqerl:new_client({Host, Port}),
     ?INFO("ID: ~p, Connected to Cassandra at ~p:~p\n", [Id, Host, Port]),
 
-    case use_keyspace (C, Keyspace) of
+    case bootstrap_keyspace (C, Keyspace, ColumnFamily, ReplFactor) of
         ok ->
             {ok, #state { client = C,
                           keyspace = Keyspace,
                           columnfamily = ColumnFamily,
 
                           date_gen = basho_bench_keygen:new(DateGen, Id),
-                          time_gen = basho_bench_keygen:new(TimeGen, Id),
-                          numval_gen = basho_bench_keygen:new(NumValGen, Id)}};
+                          time_gen = basho_bench_keygen:new(TimeGen, Id)}};
         {error, Reason} ->
-            ?FAIL_MSG("Failed to use keyspace ~p: ~p\n", [Keyspace, Reason])
+            ?FAIL_MSG("Failed to bootstrap keyspace ~p: ~p\n", [Keyspace, Reason])
     end.
 
 run(ts_insert, KeyGen, ValueGen,
     #state{client = C, columnfamily = ColumnFamily,
-           date_gen = DateGen, numval_gen = NumValGen,
-           time_gen = TimeGen} = State) ->
+           date_gen = DateGen, time_gen = TimeGen} = State) ->
 
     Statement = "INSERT INTO " ++ ColumnFamily ++
-        " (topic, date, time, numericvalue, category)" ++
-        " VALUES (?, ?, mintimeuuid(?), ?, ?);",
+        " (topic, date, time, padding)" ++
+        " VALUES (?, ?, mintimeuuid(?), ?);",
     Query = #cql_query{statement = Statement,
                        consistency = ?CQERL_CONSISTENCY_ANY,
                        reusable = true},
     Values = [{topic, KeyGen()},
               {date, DateGen()},
               {'arg0(mintimeuuid)', TimeGen()},
-              {numericvalue, NumValGen()},
-              {category, binary_to_list(ValueGen())}],
+              {padding, binary_to_list(ValueGen())}],
 
     case cqerl:run_query(C, Query#cql_query{values = Values}) of
         {ok, void} ->
@@ -120,3 +116,17 @@ use_keyspace(C, Keyspace) ->
         {error, Reason} ->
             {error, Reason}
     end.
+
+bootstrap_keyspace(C, Keyspace, ColumnFamily, ReplicationFactor) ->
+    CreateKeySpaceStmt = "CREATE KEYSPACE \"" ++ Keyspace ++ "\" " ++
+        "WITH REPLICATION = " ++
+        "{'class': 'SimpleStrategy'," ++
+        " 'replication_factor': " ++ integer_to_list(ReplicationFactor) ++ "};",
+    ?DEBUG("~p => ~p\n", [CreateKeySpaceStmt, cqerl:run_query(C, CreateKeySpaceStmt)]),
+    use_keyspace(C, Keyspace),
+    CreateTableStmt = "CREATE TABLE " ++ ColumnFamily ++ " " ++
+        "(Topic text, Date int, Time timeuuid, Padding text, " ++
+        " PRIMARY KEY ((Topic, Date), Time)) " ++
+        "WITH CLUSTERING ORDER BY (Time Asc);",
+    ?DEBUG("~p => ~p\n", [CreateTableStmt, cqerl:run_query(C, CreateTableStmt)]),
+    ok.
