@@ -25,7 +25,8 @@
 -export([new/2,
          str_concat/3,
          identity/2,
-         fixed_ascii/2]).
+         fixed_ascii/2,
+         json/3]).
 
 -include("deps/basho_bench/include/basho_bench.hrl").
 
@@ -58,4 +59,18 @@ fixed_ascii(_Id, Size)
             list_to_binary(lists:map(fun (_) ->
                                              random:uniform(31)+97
                                      end, lists:seq(1, Size)))
+    end.
+
+json(Id, Max, Size)
+  when is_integer(Size), Size >= 0 ->
+    ValGen = basho_bench_keygen:new({partitioned_sequential_int, Max}, Id),
+    PadGen = fun() ->
+                     lists:map(fun (_) ->
+                                       32
+                               end, lists:seq (1, Size))
+             end,
+    fun() ->
+            list_to_binary("{\"p\":\"" ++ PadGen() ++ "\"," ++
+                            "\"v\":\"" ++ integer_to_list(ValGen()) ++
+                            "\"}")
     end.
