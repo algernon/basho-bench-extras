@@ -22,8 +22,7 @@
 
 -module(bbe_driver_riakc_pb_sets).
 
--export([new/1,
-         run/4]).
+-export([new/1, run/4]).
 
 -include("deps/basho_bench/include/basho_bench.hrl").
 
@@ -104,6 +103,38 @@ run(set_append_only, KeyGen, ValueGen,
         {error, Reason} ->
             {error, Reason, State}
     end;
+
+
+run(set_discard_only, KeyGen, ValueGen,
+    #state{bucket_generator = BucketGen,
+          pid = Pid, type = Type, options = Options} = State) ->
+  Bucket = BucketGen(),
+  Key =KeyGen(),
+
+  {ok, Set} = case riakc_pb_socket:fetch_type(Pid, {Type,Bucket}, Key) of
+                {error,{notfound,set}} -> {ok, riakc_set:new()};
+                {ok, S} -> {ok, S}
+  end,
+
+  case riakc_set:size(Set) > 0 of
+      false -> {ok, State};
+      true ->
+      % delete last element of the set
+      ModSet=riakc_set:del_element(lists:last(ordsets:to_list(riakc_set:value(Set))), Set),
+      % persist
+      case riakc_pb_socket:update_type(Pid, { Type, Bucket }, Key, riakc_set:to_op(ModSet), Options) of
+        ok ->
+          {ok, State};
+        {notfound, set} ->
+          {ok, State};
+        {error, {notfound, set}} ->
+          {ok, State};
+        {error, disconnected} ->
+          run(set_discard_only, KeyGen, ValueGen, State);
+        {error, Reason} ->
+          {error, Reason, State}
+      end
+  end;
 
 run(set_get, KeyGen, ValueGen,
     #state{bucket_generator = BucketGen, pid = Pid, type = Type,
